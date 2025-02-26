@@ -21,7 +21,7 @@ The API will be available at http://localhost:80
 Make sure your frontend is configured to talk to the backend:
 ```env
 # in helical-frontend/.env
-VITE_API_URL=http://localhost:80
+VITE_API_URL=http://localhost:80/api/v1
 ```
 
 ## API Documentation
