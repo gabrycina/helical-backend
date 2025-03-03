@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
-from app.api.routes import router  # Import the main router
+from app.api.routes import router 
+from app.api.routes.workflows import lifespan 
 
 settings = get_settings()
 
@@ -9,6 +10,7 @@ def create_application() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
         debug=settings.DEBUG,
+        lifespan=lifespan  
     )
 
     # Add CORS middleware

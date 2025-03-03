@@ -15,10 +15,15 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
+# Create directories and set permissions
+RUN mkdir -p /code/uploads /code/results && \
+    chmod 777 /code/uploads /code/results
+
 COPY ./app /code/app
 
-# Create required directories
-RUN mkdir -p /code/uploads /code/results
+# Create mount points for external volumes
+VOLUME /code/uploads
+VOLUME /code/results
 
 # Set environment variables
 ENV PYTHONPATH=/code
@@ -27,4 +32,4 @@ ENV RESULTS_DIR=/code/results
 
 EXPOSE 8000
 
-CMD ["fastapi", "run", "app/main.py", "--port", "80"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

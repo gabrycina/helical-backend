@@ -1,5 +1,8 @@
 # 🧬 Helical backend quick start
 
+![Helical Infrastructure](helical-infra.png)
+
+
 ## Running the Backend
 
 1. Build the Docker image:
@@ -11,7 +14,7 @@ docker build -t helical-backend .
 
 2. Run the container:
 ```bash
-docker run -p 80:80 helical-backend:latest
+docker run -p 80:80 --memory="8g" --memory-swap="8g" helical-backend:latest
 ```
 
 The API will be available at http://localhost:80

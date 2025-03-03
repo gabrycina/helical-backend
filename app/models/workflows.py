@@ -1,6 +1,6 @@
 from enum import Enum
+from typing import Dict, Literal, Optional, List
 from datetime import datetime
-from typing import Optional, Literal, List
 from pydantic import BaseModel, Field
 
 class WorkflowType(str, Enum):
@@ -28,11 +28,22 @@ class SingleCellWorkflowConfig(BaseModel):
         'protected_namespaces': ()
     }
 
-class WorkflowStatus(str, Enum):
-    CREATED = "created"
-    RUNNING = "running"
+class WorkflowStatus(Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+
+class WorkflowState(BaseModel):
+    workflow_id: str
+    created_at: datetime = Field(default_factory=datetime.now)
+    status: WorkflowStatus = Field(default=WorkflowStatus.PENDING)
+    progress: float = Field(default=0.0)
+    error: Optional[str] = None
+    result: Optional[Dict] = None
+    model_config = {
+        'protected_namespaces': ()
+    }
 
 class ResultMetadata(BaseModel):
     result_id: str

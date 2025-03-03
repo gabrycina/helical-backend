@@ -26,4 +26,10 @@ class Settings(BaseSettings):
 
 @lru_cache()
 def get_settings() -> Settings:
-    return Settings() 
+    settings = Settings()
+    
+    # Ensure directories exist
+    settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    settings.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    return settings 

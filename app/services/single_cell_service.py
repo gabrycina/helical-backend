@@ -1,23 +1,18 @@
 from uuid import uuid4
-import helical
 import anndata
 import torch
-from pathlib import Path
 from app.models.workflows import (
-    SingleCellWorkflowConfig,
     WorkflowStatus,
-    WorkflowResult,
-    ResultType,
-    WorkflowResultItem
 )
 from app.core.config import get_settings
-from app.services.workflow_service import get_workflow_service
 from helical.models.scgpt.model import scGPT, scGPTConfig
 from helical.models.geneformer.model import Geneformer, GeneformerConfig
-import platform
-import os
+import logging
+from pathlib import Path
 
 settings = get_settings()
+
+logger = logging.getLogger(__name__)
 
 class SingleCellService:
     def __init__(self):
@@ -52,61 +47,60 @@ class SingleCellService:
             return torch.device('cuda')
         return torch.device('cpu')
 
-    async def create_workflow(
-        self, 
-        config: SingleCellWorkflowConfig
-    ) -> WorkflowResult:
-        workflow_service = get_workflow_service()
-        
-        # Create a new workflow
-        workflow = workflow_service.create_workflow()
-        workflow.status = WorkflowStatus.RUNNING
-        workflow_service.update_workflow(workflow)
-        
+    async def process_workflow(self, workflow_id: str, input_path: Path, model_id: str, state_manager):
+        """Process a single workflow"""
         try:
-            print(f"Loading file: {config.input_file}")
-            # Load data
-            input_path = settings.UPLOAD_DIR / config.input_file
-            data = anndata.read_h5ad(input_path)
+            state_manager.update_status(workflow_id, WorkflowStatus.PROCESSING)
+            state_manager.update_progress(workflow_id, 0.0)  # Initialize progress
+            logger.info(f"Starting workflow {workflow_id} with progress 0.0")
             
-            print(f"Initializing model: {config.model_id}")
-            # Initialize model with device already configured
-            model = self._models[config.model_id.lower()]()
+            print(f"Loading file: {input_path}")
+            data = anndata.read_h5ad(input_path)
+            logger.info(f"About to update progress for {workflow_id} to 0.4")
+            state_manager.update_progress(workflow_id, 0.4)  # 40% - Data loaded
+            logger.info(f"Progress updated for {workflow_id}")
+            
+            print(f"Initializing model: {model_id}")
+            model = self._models[model_id.lower()]()
+            logger.info(f"About to update progress for {workflow_id} to 0.5")
+            state_manager.update_progress(workflow_id, 0.5)  # 50% - Model initialized
+            logger.info(f"Progress updated for {workflow_id}")
             
             print("Processing data")
-            # Process data (device handling should be done inside the model)
             processed_data = model.process_data(data)
+            logger.info(f"About to update progress for {workflow_id} to 0.7")
+            state_manager.update_progress(workflow_id, 0.7)  # 70% - Data processed
+            logger.info(f"Progress updated for {workflow_id}")
             
             print("Generating embeddings")
-            # Generate embeddings (device handling should be done inside the model)
             embeddings = model.get_embeddings(processed_data)
+            logger.info(f"About to update progress for {workflow_id} to 0.9")
+            state_manager.update_progress(workflow_id, 0.9)  # 90% - Embeddings generated
+            logger.info(f"Progress updated for {workflow_id}")
             
             # Save results
-            output_file = f"{config.model_id}_embeddings_{workflow.workflow_id}.pt"
-            output_path = self._output_dir / output_file
+            output_file = f"{model_id}_embeddings_{workflow_id}.pt"
+            output_path = settings.RESULTS_DIR / output_file
             torch.save(embeddings, output_path)
-
-            # Add result metadata to workflow
-            workflow.results.append(
-                WorkflowResultItem(
-                    result_id=str(uuid4()),
-                    type=ResultType.EMBEDDINGS,
-                    file_path=str(output_path),
-                    file_size=output_path.stat().st_size,
-                    content_type="application/octet-stream"
-                )
-            )
-
-            workflow.status = WorkflowStatus.COMPLETED
-            workflow_service.update_workflow(workflow)
-
-            return workflow
+            
+            result = {
+                'result_id': str(uuid4()),
+                'type': 'embeddings',
+                'file_path': str(output_path),
+                'file_size': output_path.stat().st_size,
+                'content_type': 'application/octet-stream'
+            }
+            
+            state_manager.set_result(workflow_id, result)
+            logger.info(f"About to update progress for {workflow_id} to 1.0")
+            state_manager.update_progress(workflow_id, 1.0)  # 100% - Complete
+            
+            return result
             
         except Exception as e:
-            workflow.status = WorkflowStatus.FAILED
-            workflow.error_message = str(e)
-            workflow_service.update_workflow(workflow)
-            return workflow
+            logger.error(f"Workflow {workflow_id} failed: {e}")
+            state_manager.set_error(workflow_id, str(e))
+            raise
 
 _service_instance = None
 

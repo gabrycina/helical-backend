@@ -39,13 +39,20 @@ def client():
 
 @pytest.fixture
 def mock_single_cell_service():
-    """Create a mock for SingleCellService"""
-    return Mock()
+    mock = Mock()
+    # Add the required methods to the mock
+    mock.process_workflow = Mock()
+    return mock
 
 @pytest.fixture
 def mock_workflow_service():
-    """Create a mock for WorkflowService"""
-    return Mock()
+    mock = Mock()
+    # Add all required methods
+    mock.get_workflow_status = Mock()
+    mock.get_workflow = Mock()
+    mock.create_single_cell_workflow = Mock()
+    mock.get_workflows = Mock(return_value=[])
+    return mock
 
 @pytest.fixture
 def client_with_mocks(mock_single_cell_service, mock_workflow_service):
@@ -53,7 +60,7 @@ def client_with_mocks(mock_single_cell_service, mock_workflow_service):
     # Store original overrides
     original_overrides = app.dependency_overrides.copy()
     
-    # Set up dependency overrides
+    # Set up dependency overrides for both services
     app.dependency_overrides[get_service_instance] = lambda: mock_single_cell_service
     app.dependency_overrides[get_workflow_service] = lambda: mock_workflow_service
     

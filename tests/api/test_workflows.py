@@ -34,7 +34,8 @@ def client(mock_single_cell_service, mock_workflow_service):
     # Clear overrides after test
     app.dependency_overrides.clear()
 
-def test_create_single_cell_workflow(client_with_mocks, mock_single_cell_service, tmp_path):
+# TODO: fix after workers introduction
+def test_create_single_cell_workflow(client_with_mocks, mock_workflow_service, mock_single_cell_service, tmp_path):
     """Test creating a single-cell workflow"""
     # Create a mock h5ad file
     test_file = "test.h5ad"
@@ -42,43 +43,19 @@ def test_create_single_cell_workflow(client_with_mocks, mock_single_cell_service
     with open(test_file_path, "w") as f:
         f.write("mock data")
     
-    # Setup mock response
-    mock_result = WorkflowResult(
-        workflow_id="test-id",
-        status=WorkflowStatus.COMPLETED,
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
-        results=[
-            WorkflowResultItem(
-                result_id="result-1",
-                type=ResultType.EMBEDDINGS,
-                file_path="uploads/results/scgpt_embeddings.pt",
-                file_size=1000,
-                content_type="application/octet-stream",
-                created_at=datetime.now()
-            )
-        ],
-        error_message=None
-    )
+    # Setup mock response for workflow creation
+    mock_workflow_service.create_single_cell_workflow.return_value = "test-id"
     
-    # Configure the mock
-    mock_single_cell_service.create_workflow.return_value = mock_result
-
     # Test the endpoint
-    response = client_with_mocks.post(
-        "/api/v1/workflows/single-cell",
-        json={
-            "input_file": test_file,
-            "model_id": "scgpt",
-            "embedding_mode": "cls"
-        }
-    )
+    with open(test_file_path, "rb") as f:
+        response = client_with_mocks.post(
+            "/api/v1/workflows/single-cell",
+            files={"file": ("test.h5ad", f, "application/octet-stream")},
+            data={"model_id": "scgpt"}
+        )
 
     assert response.status_code == 200
-    response_data = response.json()
-    assert response_data["workflow_id"] == "test-id"
-    assert response_data["status"] == "completed"
-    assert len(response_data["results"]) == 1
+    assert response.json()["id"] == "test-id"
 
 def test_invalid_model_id(client):
     """Test validation of model_id"""
@@ -104,38 +81,42 @@ def test_invalid_embedding_mode(client):
     )
     assert response.status_code == 422 
 
+# TODO: fix after workers introduction
 def test_get_workflow_status(client_with_mocks, mock_workflow_service):
     """Test retrieving workflow status"""
     # Create a mock workflow result
-    mock_result = WorkflowResult(
+    mock_result = {
+        "id": "test-id",
+        "status": WorkflowStatus.COMPLETED.value,
+        "progress": 1.0,
+        "error": None,
+        "result": None,
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat(),
+        "results": [{
+            "result_id": "result-1",
+            "type": ResultType.EMBEDDINGS.value,
+            "file_path": "results/embeddings_test.pt",
+            "file_size": 1000,
+            "content_type": "application/octet-stream",
+            "created_at": datetime.now().isoformat()
+        }]
+    }
+
+    # Configure both get_workflow and get_workflow_status mocks
+    mock_workflow_service.get_workflow.return_value = WorkflowResult(
         workflow_id="test-id",
         status=WorkflowStatus.COMPLETED,
         created_at=datetime.now(),
-        updated_at=datetime.now(),
-        results=[
-            WorkflowResultItem(
-                result_id="result-1",
-                type=ResultType.EMBEDDINGS,
-                file_path="results/embeddings_test.pt",
-                file_size=1000,
-                content_type="application/octet-stream",
-                created_at=datetime.now()
-            )
-        ],
-        error_message=None
+        updated_at=datetime.now()
     )
-    
-    # Configure the mock
-    mock_workflow_service.get_workflow.return_value = mock_result
+    mock_workflow_service.get_workflow_status.return_value = mock_result
 
-    # Test the endpoint
     response = client_with_mocks.get("/api/v1/workflows/test-id")
-    
-    # Assertions
     assert response.status_code == 200
-    response_data = response.json()
-    assert response_data["workflow_id"] == "test-id"
-    assert response_data["status"] == "completed"
+    data = response.json()
+    assert data["id"] == "test-id"
+    assert data["status"] == WorkflowStatus.COMPLETED.value
 
 def test_get_nonexistent_workflow(client_with_mocks, mock_workflow_service):
     """Test retrieving a nonexistent workflow"""
